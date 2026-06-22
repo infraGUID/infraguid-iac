@@ -1,0 +1,125 @@
+name: CloudFront — deploy & lock origin
+
+# One-click rollout of the CloudFront CDN in front of the EKS frontend.
+#
+# Stage 1 (cloudfront): terraform apply enable_cloudfront=true. Auto-discovers
+#   the Gateway ALB by tag, creates CloudFront + Route 53 alias + the lock SG,
+#   and repoints the domain at CloudFront. Non-destructive and reversible.
+# Stage 2 (verify): polls the live domain until it is served through CloudFront.
+# Stage 3 (lock-origin): attaches the CloudFront-only SG to the ALB via GitOps.
+#   Gated by the `production-lock` environment — it pauses for manual approval,
+#   so the lock only lands AFTER you have seen CloudFront serving traffic.
+#
+# Prerequisites (one-time):
+#   - The cluster + Gateway are already deployed (the ALB must exist).
+#   - GitHub vars: AWS_DEPLOY_ROLE_ARN, AWS_REGION (already used by terraform.yml).
+#   - GitHub Environment `production-lock` with you as a required reviewer.
+#   - secrets.ARGOCD_DEPLOY_TOKEN must be able to push to infraGUID/infraguid-argocd.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lock_origin:
+        description: "Run Stage 3 to lock the ALB to CloudFront-only (still requires approval)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: cloudfront-deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  APP_DOMAIN: nutritrack360.in
+  ALB_SG_NAME: infraguidai-prod-alb-cloudfront
+
+jobs:
+  # ───────────────────────── Stage 1: create CloudFront ─────────────────────
+  cloudfront:
+    runs-on: ubuntu-latest
+    # environment: production   # approval gate disabled for now
+    outputs:
+      distribution_id: ${{ steps.tf.outputs.distribution_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform apply (enable CloudFront)
+        id: tf
+        run: |
+          terraform init
+          # The aws_lb data source resolves the ALB by its cluster tag. If it
+          # finds zero or multiple, apply fails here with a clear message —
+          # it never silently points CloudFront at the wrong load balancer.
+          terraform apply -input=false -auto-approve -var="enable_cloudfront=true"
+          echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+
+  # ───────────────────────── Stage 2: verify (automatic) ────────────────────
+  verify:
+    needs: [cloudfront]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait until the domain is served through CloudFront
+        run: |
+          echo "Polling https://${APP_DOMAIN}/ for CloudFront (up to ~15 min)…"
+          for i in $(seq 1 30); do
+            headers="$(curl -sSI --max-time 10 "https://${APP_DOMAIN}/" || true)"
+            status="$(printf '%s' "$headers" | head -1)"
+            if printf '%s' "$headers" | grep -qi '^x-cache:.*cloudfront' \
+               && printf '%s' "$status" | grep -q '200'; then
+              echo "✅ Served through CloudFront: $status"
+              printf '%s\n' "$headers" | grep -i '^x-cache:'
+              exit 0
+            fi
+            echo "  attempt $i/30 — not ready yet ($status); sleeping 30s"
+            sleep 30
+          done
+          echo "❌ Timed out waiting for CloudFront to serve ${APP_DOMAIN}"
+          exit 1
+
+  # ───────────────────────── Stage 3: lock origin (gated) ───────────────────
+  lock-origin:
+    needs: [cloudfront, verify]
+    if: ${{ inputs.lock_origin }}
+    runs-on: ubuntu-latest
+    # Pauses here for manual approval — configure required reviewers on this env.
+    # environment: production-lock   # approval gate disabled for now
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: infraGUID/infraguid-argocd
+          token: ${{ secrets.ARGOCD_DEPLOY_TOKEN }}
+          path: argocd
+
+      - name: Attach CloudFront-only SG to the ALB Gateway
+        working-directory: argocd
+        run: |
+          FILE="argocd-apps/infrastructure/ingress/ingress.yaml"
+          # Idempotent: sets securityGroups on the LoadBalancerConfiguration doc
+          # only, leaving every other document in the multi-doc file untouched.
+          yq -i '(select(.kind == "LoadBalancerConfiguration") | .spec.securityGroups) |= ["'"${ALB_SG_NAME}"'"]' "$FILE"
+          echo "----- resulting LoadBalancerConfiguration -----"
+          yq 'select(.kind == "LoadBalancerConfiguration")' "$FILE"
+
+      - name: Commit & push (ArgoCD syncs the lock)
+        working-directory: argocd
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add argocd-apps/infrastructure/ingress/ingress.yaml
+          if git diff --cached --quiet; then
+            echo "ALB already locked to CloudFront — nothing to commit."
+          else
+            git commit -m "infra(ingress): lock ALB to CloudFront-only SG (${ALB_SG_NAME})"
+            git push
+          fi

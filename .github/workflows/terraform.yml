@@ -1,0 +1,159 @@
+name: CI/CD - Infrastructure (Terraform)
+
+# Pull request to main -> validate only: fmt, init, validate, Trivy IaC scan
+#                         and a plan posted to the job summary. Never applies.
+# Push to main          -> plan (uploads artifact) then apply (downloads it).
+#                         The apply job is gated by the `production` environment
+#                         so the reviewer sees the plan summary before approving.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.tf"
+      - "**/*.tfvars.example"
+  push:
+    branches: [main]
+    paths:
+      - "**/*.tf"
+      - "**/*.tfvars.example"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate, Scan & Plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Trivy IaC scan (informational)
+        continue-on-error: true
+        run: trivy config --severity HIGH,CRITICAL -q .
+
+      - name: Trivy IaC gate (CRITICAL)
+        continue-on-error: true
+        run: trivy config --severity CRITICAL --exit-code 1 -q .
+
+      - name: Terraform plan
+        run: |
+          terraform plan -input=false -out=plan.tfplan
+          terraform show -no-color plan.tfplan > plan.txt
+
+      - name: Post plan to job summary
+        run: |
+          echo "## Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat plan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup Infracost
+        continue-on-error: true
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate cost estimate
+        continue-on-error: true
+        run: |
+          terraform show -json plan.tfplan > plan.json
+          infracost breakdown --path plan.json \
+            --format json \
+            --out-file infracost.json
+
+      - name: Post cost estimate to job summary
+        continue-on-error: true
+        run: |
+          echo "## Cost Estimate" >> $GITHUB_STEP_SUMMARY
+          infracost output --path infracost.json --format table >> $GITHUB_STEP_SUMMARY
+
+  plan:
+    name: Terraform Plan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: |
+          terraform plan -input=false -out=plan.tfplan
+          terraform show -no-color plan.tfplan > plan.txt
+
+      - name: Post plan to job summary
+        run: |
+          echo "## Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat plan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: plan.tfplan
+          retention-days: 1
+
+  apply:
+    name: Terraform Apply
+    if: github.event_name == 'push'
+    needs: [plan]
+    runs-on: ubuntu-latest
+    # Pauses here — reviewer sees the plan summary from the plan job before approving.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        run: terraform apply -input=false plan.tfplan

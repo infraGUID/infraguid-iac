@@ -1,0 +1,19 @@
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.tfvars
+!*.tfvars.example
+tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.DS_Store
+Thumbs.db
+
+# log-intel lambda build artifacts
+modules/log-intel-lambda/build/layer/
+modules/log-intel-lambda/build/*-layer.zip
