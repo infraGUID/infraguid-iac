@@ -236,9 +236,12 @@ resource "aws_s3_bucket_logging" "this" {
 resource "aws_s3_bucket_replication_configuration" "this" {
   for_each = var.enable_replication ? aws_s3_bucket.this : {}
 
-  bucket     = each.value.id
-  role       = aws_iam_role.replication[0].arn
-  depends_on = [aws_s3_bucket_versioning.this]
+  bucket = each.value.id
+  role   = aws_iam_role.replication[0].arn
+  depends_on = [
+    aws_s3_bucket_versioning.this,
+    aws_s3_bucket_versioning.replica,
+  ]
 
   rule {
     id     = "replicate-all-to-dr"
