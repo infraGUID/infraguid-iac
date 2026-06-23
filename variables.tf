@@ -152,9 +152,9 @@ variable "enable_argocd_correlation" {
 }
 
 variable "enable_log_intel" {
-  description = "Deploy the CS-02 Log Intelligence Lambda (langchain deps layer). Disabled by default — the layer exceeds Lambda's 70MB direct-upload limit; needs S3-based layer publishing before enabling."
+  description = "Deploy the CS-02 Log Intelligence Lambda. Enabled by default: the langchain deps layer is published via S3 (aws_s3_object -> aws_lambda_layer_version) to stay under Lambda's 70MB direct-upload limit. Must stay true so CI applies (which run with bare defaults, no tfvars) do not destroy the lambda + its pod-logs log group + subscription filter."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "argocd_server_url" {
