@@ -91,41 +91,9 @@ jobs:
           echo "## Cost Estimate" >> $GITHUB_STEP_SUMMARY
           infracost output --path infracost.json --format table >> $GITHUB_STEP_SUMMARY
 
-  plan:
-    name: Terraform Plan
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Terraform init
-        run: terraform init -input=false
-
-      - name: Terraform plan
-        run: |
-          terraform plan -input=false -out=plan.tfplan
-          terraform show -no-color plan.tfplan > plan.txt
-
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: |
-            plan.tfplan
-            plan.txt
-          retention-days: 1
-
   apply:
     name: Terraform Apply
     if: github.event_name == 'push'
-    needs: [plan]
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -138,10 +106,27 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Download plan artifact
+      - name: Find PR validate run ID
+        id: find-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list \
+            --workflow=terraform.yml \
+            --branch="${{ github.ref_name }}" \
+            --event=pull_request \
+            --status=success \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Download plan artifact from PR run
         uses: actions/download-artifact@v4
         with:
-          name: terraform-plan
+          name: terraform-plan-pr
+          run-id: ${{ steps.find-run.outputs.run-id }}
+          github-token: ${{ github.token }}
 
       - name: Terraform init
         run: terraform init -input=false
