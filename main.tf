@@ -1,5 +1,4 @@
-# Terraform Configuration
-terraform {
+﻿terraform {
   required_version = ">= 1.5.0"
 
   backend "s3" {
@@ -30,7 +29,6 @@ terraform {
   }
 }
 
-# Provider
 provider "aws" {
   region = var.aws_region
 
@@ -48,7 +46,6 @@ provider "aws" {
   }
 }
 
-# Local Values
 locals {
   common_tags = {
     Project     = var.project
@@ -56,7 +53,6 @@ locals {
     ManagedBy   = "terraform"
   }
 
-  # Containerized services that get an ECR repository.
   ecr_services = [
     "chat-service",
     "agent-service",
@@ -65,48 +61,34 @@ locals {
     "frontend",
   ]
 
-  # ── Cost Estimation ────────────────────────────────────────────────────────
-  # On-demand pricing for us-east-1. For accurate CI cost gating use Infracost:
-  #   infracost breakdown --path .
   hours_per_month = 730 # 365 * 24 / 12
 
-  # EKS — control plane + worker nodes (t3.large)
   _eks_control_plane = 0.10 * local.hours_per_month
   _eks_workers       = 0.0832 * local.hours_per_month * var.node_desired_size
   cost_eks           = local._eks_control_plane + local._eks_workers
 
-  # RDS — db.t3.micro instance + gp2 storage (doubles for Multi-AZ)
   _rds_instance = 0.017 * local.hours_per_month * (var.rds_multi_az ? 2 : 1)
   _rds_storage  = 0.115 * var.rds_allocated_storage
   cost_rds      = local._rds_instance + local._rds_storage
 
-  # NAT Gateways — one per AZ + estimated data processing
   _nat_hourly = 0.045 * local.hours_per_month * length(var.azs)
   _nat_data   = 10.0 # $/month data processing estimate
   cost_nat    = local._nat_hourly + local._nat_data
 
-  # ALB — base hourly only (provisioned by ALB Ingress Controller, not Terraform)
   cost_alb = 0.008 * local.hours_per_month
 
-  # ECR — 5 repositories, estimated 10 GB total image storage
   cost_ecr = 0.10 * 10.0
 
-  # S3 — 3 buckets (documents, knowledge-base, lambda-artifacts), ~20 GB est.
   cost_s3 = 0.023 * 20.0
 
-  # KMS — $1/key/month for the single customer-managed key
   cost_kms = 1.00
 
-  # Secrets Manager — $0.40/secret/month
   cost_secrets = 0.40
 
-  # Route53 — $0.50/hosted zone/month
   cost_route53 = 0.50
 
-  # Lambda, SQS, SNS, Cognito — within AWS free tier at capstone scale
   cost_free_tier_services = 0.0
 
-  # ── Totals ─────────────────────────────────────────────────────────────────
   cost_total_monthly = (
     local.cost_eks +
     local.cost_rds +
@@ -120,7 +102,6 @@ locals {
     local.cost_free_tier_services
   )
 
-  # Terraform has no round(); floor(x + 0.5) rounds to the nearest integer.
   cost_breakdown = {
     eks_control_plane        = floor(local._eks_control_plane + 0.5)
     eks_worker_nodes         = floor(local._eks_workers + 0.5)
@@ -137,7 +118,6 @@ locals {
   }
 }
 
-# ─────────────────────────────── Networking ───────────────────────────────
 module "vpc" {
   source = "./modules/vpc"
 
@@ -150,7 +130,6 @@ module "vpc" {
   tags        = local.common_tags
 }
 
-# ─────────────────────────────── Encryption ───────────────────────────────
 module "kms" {
   source = "./modules/kms"
 
@@ -175,7 +154,6 @@ module "kms_dr" {
   tags           = local.common_tags
 }
 
-# ─────────────────────────────── Storage (new buckets) ─────────────────────
 module "s3" {
   source = "./modules/s3"
 
@@ -195,7 +173,6 @@ module "s3" {
   tags               = local.common_tags
 }
 
-# ─────────────────────────────── Auth ──────────────────────────────────────
 module "cognito" {
   source = "./modules/cognito"
 
@@ -204,7 +181,6 @@ module "cognito" {
   tags        = local.common_tags
 }
 
-# ─────────────────────────────── Database ─────────────────────────────────
 module "rds" {
   source = "./modules/rds"
 
@@ -236,7 +212,6 @@ resource "aws_db_instance_automated_backups_replication" "this" {
   depends_on = [module.kms_dr]
 }
 
-# ─────────────────────────────── Async queue ──────────────────────────────
 module "sqs" {
   source = "./modules/sqs"
 
@@ -246,7 +221,6 @@ module "sqs" {
   tags        = local.common_tags
 }
 
-# ─────────────────────────────── Secrets ─────────────────────────────────
 module "secrets" {
   source = "./modules/secrets"
 
@@ -265,7 +239,6 @@ module "secrets" {
   tags                    = local.common_tags
 }
 
-# ─────────────────────────────── ECR ──────────────────────────────────────
 module "ecr" {
   source = "./modules/ecr"
 
@@ -275,7 +248,6 @@ module "ecr" {
   tags         = local.common_tags
 }
 
-# ─────────────────────────────── EKS ──────────────────────────────────────
 module "eks" {
   source = "./modules/eks"
 
@@ -293,7 +265,6 @@ module "eks" {
   tags                = local.common_tags
 }
 
-# Allow worker nodes to reach RDS.
 resource "aws_vpc_security_group_ingress_rule" "rds_from_nodes" {
   security_group_id            = module.vpc.rds_security_group_id
   description                  = "PostgreSQL from EKS worker nodes"
@@ -303,7 +274,6 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_nodes" {
   referenced_security_group_id = module.eks.cluster_security_group_id
 }
 
-# ─────────────────────────────── IRSA ─────────────────────────────────────
 module "irsa" {
   source = "./modules/irsa"
 
@@ -321,9 +291,6 @@ module "irsa" {
   tags                      = local.common_tags
 }
 
-# EBS CSI driver addon — separate from module.eks to avoid a circular
-# dependency (the addon needs the IRSA role ARN from module.irsa, which itself
-# depends on module.eks for the OIDC provider ARN).
 resource "aws_eks_addon" "ebs_csi" {
   cluster_name             = module.eks.cluster_name
   addon_name               = "aws-ebs-csi-driver"
@@ -335,7 +302,6 @@ resource "aws_eks_addon" "ebs_csi" {
   tags = local.common_tags
 }
 
-# ─────────────────────────── DNS / Certificate ────────────────────────────
 module "dns" {
   source = "./modules/dns"
 
@@ -344,12 +310,6 @@ module "dns" {
   tags           = local.common_tags
 }
 
-# ─────────────────────── Frontend CDN (CloudFront) ────────────────────────
-# CloudFront caches the pod-served frontend at the edge, using the Gateway ALB
-# as origin. Two-phase: apply once with enable_cloudfront=false to stand up the
-# cluster + Gateway, then set enable_cloudfront=true and apply again — the ALB
-# origin is auto-discovered by cluster tag. The CloudFront workflow
-# (.github/workflows/cloudfront.yml) automates this. See modules/frontend.
 module "frontend" {
   source = "./modules/frontend"
   count  = var.enable_cloudfront ? 1 : 0
@@ -364,7 +324,6 @@ module "frontend" {
   tags                = local.common_tags
 }
 
-# ─────────────────────────────── SNS alerts ───────────────────────────────
 module "sns" {
   source = "./modules/sns"
 
@@ -375,11 +334,6 @@ module "sns" {
   tags        = local.common_tags
 }
 
-# ──────────────────── CloudWatch autoscaling alarms ───────────────────────
-# Alerts when the EKS node group hits its max size (cluster autoscaler can't
-# add nodes) or runs sustained-high CPU. Publishes to a dedicated, properly
-# permissioned SNS topic (see modules/cloudwatch for why it isn't the log-intel
-# alerts topic) that emails var.alert_email.
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
@@ -393,7 +347,6 @@ module "cloudwatch" {
   tags                = local.common_tags
 }
 
-# ─────────────────── CS-02 Log Intelligence Agent (Lambda) ────────────────
 module "log_intel_lambda" {
   source = "./modules/log-intel-lambda"
   count  = var.enable_log_intel ? 1 : 0
@@ -415,10 +368,6 @@ module "log_intel_lambda" {
   tags                      = local.common_tags
 }
 
-# Allow the log-intel Lambda to reach the EKS API server (private endpoint).
-# Without this the Lambda's read-only k8s tool calls (pod status, events, nodes)
-# time out, and the agent can only report from logs/metrics. RBAC access is
-# granted separately via the module's EKS access entry (log-intel-readers).
 resource "aws_vpc_security_group_ingress_rule" "eks_api_from_log_intel" {
   count                        = var.enable_log_intel ? 1 : 0
   security_group_id            = module.eks.cluster_security_group_id

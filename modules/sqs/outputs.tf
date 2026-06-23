@@ -1,4 +1,4 @@
-output "ingestion_queue_url" {
+﻿output "ingestion_queue_url" {
   description = "URL of the ingestion SQS queue (set as SQS_INGESTION_QUEUE_URL)"
   value       = aws_sqs_queue.ingestion.url
 }

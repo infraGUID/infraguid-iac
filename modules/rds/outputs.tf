@@ -1,4 +1,4 @@
-output "endpoint" {
+﻿output "endpoint" {
   description = "RDS instance endpoint (host:port)"
   value       = aws_db_instance.this.endpoint
 }

@@ -1,29 +1,7 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# CloudFront in front of the EKS frontend.
-#
-# The frontend runs as a pod (nginx) only — there is no S3 static bucket. The
-# AWS Load Balancer Controller provisions the ALB from the Gateway API resources
-# in the GitOps repo, and CloudFront uses that ALB as a custom origin.
-#
-# Request flow:
-#   viewer -> CloudFront -> ALB (Host: <domain> forwarded) -> HTTPRoute
-#     /     -> frontend nginx pod   (cached per nginx Cache-Control headers)
-#     /api/* -> chat-service        (never cached)
-#
-# Forwarding the Host header is REQUIRED: the HTTPRoute only matches
-# hostnames=[<domain>], and the ALB origin TLS cert is issued for <domain>, so
-# the forwarded Host makes both the route match and the origin handshake succeed.
-# ─────────────────────────────────────────────────────────────────────────────
-
-locals {
+﻿locals {
   alb_origin_id = "alb-${var.environment}"
 }
 
-# Auto-discover the ALB the AWS Load Balancer Controller provisioned from the
-# Gateway. The controller tags every load balancer it manages with the cluster
-# name, and this cluster has exactly one internet-facing ALB — so this uniquely
-# resolves it with no manual `kubectl get gateway` copy-paste. If it matches zero
-# or multiple LBs, terraform fails loudly here rather than guessing.
 data "aws_lb" "gateway" {
   tags = {
     "elbv2.k8s.aws/cluster" = var.eks_cluster_name
@@ -44,7 +22,6 @@ resource "aws_cloudfront_distribution" "this" {
     minimum_protocol_version = "TLSv1.2_2021"
   }
 
-  # Single origin: the Gateway-provisioned ALB (auto-discovered above).
   origin {
     domain_name = data.aws_lb.gateway.dns_name
     origin_id   = local.alb_origin_id
@@ -59,9 +36,6 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # Default behavior — static frontend served by the nginx pod. CloudFront caches
-  # according to the Cache-Control headers nginx sends (html = no-cache, assets =
-  # max-age=3600). default_ttl=0 means "do not cache" when no header is present.
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
@@ -71,7 +45,6 @@ resource "aws_cloudfront_distribution" "this" {
 
     forwarded_values {
       query_string = false
-      # Host is mandatory so the ALB HTTPRoute hostname match + origin TLS work.
       headers = ["Host"]
       cookies {
         forward = "none"
@@ -83,7 +56,6 @@ resource "aws_cloudfront_distribution" "this" {
     max_ttl     = 31536000
   }
 
-  # /api/* — proxied straight through to the backend, never cached.
   ordered_cache_behavior {
     path_pattern           = "/api/*"
     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -116,10 +88,6 @@ resource "aws_cloudfront_distribution" "this" {
   })
 }
 
-# Point the apex domain at CloudFront. allow_overwrite takes ownership of any
-# pre-existing record (e.g. a manual A record that previously pointed at the
-# ALB). If external-dns manages this record from the HTTPRoute hostnames, remove
-# those hostnames or exclude this record there to avoid a tug-of-war.
 resource "aws_route53_record" "a" {
   zone_id = var.hosted_zone_id
   name    = var.domain_name
@@ -148,12 +116,6 @@ resource "aws_route53_record" "aaaa" {
   }
 }
 
-# ─────────────────────────── Origin lock-down ─────────────────────────────
-# Security group that only accepts traffic from CloudFront's edge IP ranges,
-# published by AWS as the "origin-facing" managed prefix list. Attach this SG
-# to the ALB (via the Gateway LoadBalancerConfiguration.securityGroups field)
-# so the cluster cannot be reached by hitting the raw ALB DNS name directly —
-# all traffic must go through CloudFront.
 data "aws_ec2_managed_prefix_list" "cloudfront" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }

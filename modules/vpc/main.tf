@@ -1,5 +1,4 @@
-# VPC
-resource "aws_vpc" "this" {
+﻿resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -9,7 +8,6 @@ resource "aws_vpc" "this" {
   })
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
@@ -18,16 +16,12 @@ resource "aws_internet_gateway" "this" {
   })
 }
 
-# Public Subnets
 resource "aws_subnet" "public" {
   count = length(var.public_subnets)
 
   vpc_id            = aws_vpc.this.id
   cidr_block        = var.public_subnets[count.index]
   availability_zone = var.azs[count.index]
-  # Public LBs (NLB/ALB) and NAT gateways get addresses from their own service /
-  # EIPs, not from subnet auto-assign, and no EC2 instances launch here (EKS nodes
-  # are in private subnets). Disabled to satisfy AWS-0164 (avoid auto public IPs).
   map_public_ip_on_launch = false
 
   tags = merge(var.tags, {
@@ -38,7 +32,6 @@ resource "aws_subnet" "public" {
   })
 }
 
-# Private Subnets (EC2)
 resource "aws_subnet" "private" {
   count = length(var.private_subnets)
 
@@ -54,7 +47,6 @@ resource "aws_subnet" "private" {
   })
 }
 
-# Isolated Subnets (RDS)
 resource "aws_subnet" "isolated" {
   count = length(var.isolated_subnets)
 
@@ -68,7 +60,6 @@ resource "aws_subnet" "isolated" {
   })
 }
 
-# Elastic IPs for NAT Gateways
 resource "aws_eip" "nat" {
   count  = length(var.public_subnets)
   domain = "vpc"
@@ -78,7 +69,6 @@ resource "aws_eip" "nat" {
   })
 }
 
-# NAT Gateways (one per AZ)
 resource "aws_nat_gateway" "this" {
   count = length(var.public_subnets)
 
@@ -92,7 +82,6 @@ resource "aws_nat_gateway" "this" {
   depends_on = [aws_internet_gateway.this]
 }
 
-# Route Tables — Public
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
@@ -114,7 +103,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Route Tables — Private (one per AZ for HA NAT)
 resource "aws_route_table" "private" {
   count  = length(var.private_subnets)
   vpc_id = aws_vpc.this.id
@@ -139,7 +127,6 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private[count.index].id
 }
 
-# Route Tables — Isolated (no internet access)
 resource "aws_route_table" "isolated" {
   vpc_id = aws_vpc.this.id
 
@@ -155,7 +142,6 @@ resource "aws_route_table_association" "isolated" {
   route_table_id = aws_route_table.isolated.id
 }
 
-# Security Group — ALB
 resource "aws_security_group" "alb" {
   name_prefix = "${var.project}-${var.environment}-alb-"
   description = "ALB security group - allow HTTP/HTTPS from anywhere"
@@ -195,7 +181,6 @@ resource "aws_vpc_security_group_egress_rule" "alb_all" {
   cidr_ipv4         = var.vpc_cidr
 }
 
-# Security Group — EC2 Backend
 resource "aws_security_group" "ec2" {
   name_prefix = "${var.project}-${var.environment}-ec2-"
   description = "EC2 backend - allow 8000 from ALB only"
@@ -226,7 +211,6 @@ resource "aws_vpc_security_group_egress_rule" "ec2_all" {
   cidr_ipv4         = var.vpc_cidr
 }
 
-# Security Group — RDS
 resource "aws_security_group" "rds" {
   name_prefix = "${var.project}-${var.environment}-rds-"
   description = "RDS PostgreSQL - allow 5432 from EC2 only"
@@ -257,7 +241,6 @@ resource "aws_vpc_security_group_egress_rule" "rds_all" {
   cidr_ipv4         = var.vpc_cidr
 }
 
-# Security Group — VPC Endpoints
 resource "aws_security_group" "vpce" {
   name_prefix = "${var.project}-${var.environment}-vpce-"
   description = "VPC Endpoints - allow HTTPS from VPC CIDR"
@@ -288,7 +271,6 @@ resource "aws_vpc_security_group_egress_rule" "vpce_all" {
   cidr_ipv4         = var.vpc_cidr
 }
 
-# VPC Endpoints — SSM (for Session Manager, no bastion host needed)
 resource "aws_vpc_endpoint" "ssm" {
   vpc_id              = aws_vpc.this.id
   service_name        = "com.amazonaws.${var.aws_region}.ssm"
@@ -328,7 +310,6 @@ resource "aws_vpc_endpoint" "ec2messages" {
   })
 }
 
-# VPC Endpoint — S3 (Gateway, free)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.this.id
   service_name      = "com.amazonaws.${var.aws_region}.s3"
@@ -340,7 +321,6 @@ resource "aws_vpc_endpoint" "s3" {
   })
 }
 
-# VPC Endpoint — Secrets Manager (Interface)
 resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_id              = aws_vpc.this.id
   service_name        = "com.amazonaws.${var.aws_region}.secretsmanager"
@@ -354,7 +334,6 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   })
 }
 
-# VPC Flow Logs
 resource "aws_cloudwatch_log_group" "vpc_flow" {
   name              = "/aws/vpc/${var.project}-${var.environment}/flow-logs"
   retention_in_days = 30

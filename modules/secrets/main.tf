@@ -1,5 +1,4 @@
-# Secrets Manager Secret
-resource "aws_secretsmanager_secret" "app" {
+﻿resource "aws_secretsmanager_secret" "app" {
   name        = "${var.project}/${var.environment}/app-secrets"
   description = "Application secrets for ${var.project} ${var.environment}"
   kms_key_id  = var.kms_key_arn
@@ -9,9 +8,7 @@ resource "aws_secretsmanager_secret" "app" {
   })
 }
 
-# Secret Version — populated with all runtime config
 locals {
-  # Strip the port from the endpoint if present (RDS returns host:port)
   rds_host = split(":", var.rds_endpoint)[0]
 }
 

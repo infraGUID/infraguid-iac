@@ -1,4 +1,4 @@
-variable "namespace" {
+﻿variable "namespace" {
   description = "ECR repository namespace prefix (e.g. infragui)"
   type        = string
   default     = "infragui"

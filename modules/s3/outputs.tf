@@ -1,4 +1,4 @@
-output "documents_bucket_name" {
+﻿output "documents_bucket_name" {
   description = "Documents bucket name"
   value       = aws_s3_bucket.this["documents"].id
 }

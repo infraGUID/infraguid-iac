@@ -1,11 +1,7 @@
-# One ECR repository per containerized service.
-# Repo names are namespaced as "infragui/<service>" per project convention.
-resource "aws_ecr_repository" "this" {
+﻿resource "aws_ecr_repository" "this" {
   for_each = toset(var.repositories)
 
   name = "${var.namespace}/${each.value}"
-  # Immutable tags (AWS-0031) — the CD pipeline publishes unique semver tags and
-  # blocks re-publishing an existing tag, so immutability is compatible.
   image_tag_mutability = "IMMUTABLE"
   force_delete         = true
 
@@ -23,7 +19,6 @@ resource "aws_ecr_repository" "this" {
   })
 }
 
-# Lifecycle policy — keep the last 10 tagged images, expire untagged after 7 days.
 resource "aws_ecr_lifecycle_policy" "this" {
   for_each   = aws_ecr_repository.this
   repository = each.value.name

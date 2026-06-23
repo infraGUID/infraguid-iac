@@ -1,11 +1,4 @@
-# ───────────────────────────────────────────────────────────────────────────
-# CS-02 Kubernetes Log Intelligence Agent — event-triggered Lambda.
-# Fluent Bit ships pod logs to the CloudWatch log group below; a subscription
-# filter invokes this Lambda ONLY on lines matching the anomaly pattern.
-# ───────────────────────────────────────────────────────────────────────────
-
-# Log group Fluent Bit writes pod logs into.
-resource "aws_cloudwatch_log_group" "pod_logs" {
+﻿resource "aws_cloudwatch_log_group" "pod_logs" {
   name              = var.log_group_name
   retention_in_days = var.log_retention_days
 
@@ -14,7 +7,6 @@ resource "aws_cloudwatch_log_group" "pod_logs" {
   })
 }
 
-# Security group for the VPC-attached Lambda (egress only).
 resource "aws_security_group" "lambda" {
   name_prefix = "${var.project}-${var.environment}-logintel-"
   description = "Log Intelligence Lambda - egress only"
@@ -35,7 +27,6 @@ resource "aws_security_group" "lambda" {
   }
 }
 
-# Execution role
 resource "aws_iam_role" "lambda" {
   name = "${var.project}-${var.environment}-logintel-role"
 
@@ -51,7 +42,6 @@ resource "aws_iam_role" "lambda" {
   tags = var.tags
 }
 
-# VPC ENI management + base logging for the function's own logs.
 resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
@@ -119,16 +109,12 @@ resource "aws_iam_role_policy" "lambda" {
   })
 }
 
-# Package the Lambda source at apply time (source-only; deps ship in the layer).
 data "archive_file" "lambda" {
   type        = "zip"
   source_dir  = var.lambda_source_dir
   output_path = "${path.module}/build/log-intel-lambda.zip"
 }
 
-# ── Dependencies layer (LangGraph / LangChain / pydantic) ───────────────────
-# The agent now has real pip dependencies. Build them into build/layer/python
-# with Linux wheels (we may apply from Windows), then zip + publish as a layer.
 resource "terraform_data" "deps" {
   triggers_replace = filemd5("${var.lambda_source_dir}/requirements.txt")
 
@@ -153,18 +139,10 @@ data "archive_file" "deps_layer" {
   depends_on  = [terraform_data.deps]
 }
 
-# The zipped deps layer (~58MB) is too large for a direct PublishLayerVersion
-# request (which base64-inflates past the ~70MB API limit), so stage it in S3
-# and publish the layer from there. The hash in the key forces a re-upload +
-# new layer version whenever the dependencies change.
 resource "aws_s3_object" "deps_layer" {
   bucket = var.artifacts_bucket
   key    = "layers/log-intel-deps-${data.archive_file.deps_layer.output_base64sha256}.zip"
   source = data.archive_file.deps_layer.output_path
-  # Use source_hash (not etag): the artifacts bucket is SSE-KMS, so S3 returns a
-  # multipart etag that never equals the local MD5 — `etag` would show a perpetual
-  # in-place diff on every plan. source_hash keys off the same content hash that
-  # drives the object key, so a real dependency change still forces a new object.
   source_hash = data.archive_file.deps_layer.output_base64sha256
 }
 
@@ -208,7 +186,6 @@ resource "aws_lambda_function" "this" {
   tags = var.tags
 }
 
-# Allow CloudWatch Logs to invoke the function.
 resource "aws_lambda_permission" "logs" {
   statement_id  = "AllowCloudWatchLogsInvoke"
   action        = "lambda:InvokeFunction"
@@ -217,7 +194,6 @@ resource "aws_lambda_permission" "logs" {
   source_arn    = "${aws_cloudwatch_log_group.pod_logs.arn}:*"
 }
 
-# Subscription filter — invokes the Lambda only on anomaly lines.
 resource "aws_cloudwatch_log_subscription_filter" "anomalies" {
   name            = "${var.project}-${var.environment}-anomaly-filter"
   log_group_name  = aws_cloudwatch_log_group.pod_logs.name
@@ -227,8 +203,6 @@ resource "aws_cloudwatch_log_subscription_filter" "anomalies" {
   depends_on = [aws_lambda_permission.logs]
 }
 
-# EKS access entry — read-only group the Lambda role maps to (for optional
-# live pod/event lookups). RBAC binding for this group is shipped via ArgoCD.
 resource "aws_eks_access_entry" "lambda" {
   count             = var.eks_access_entry ? 1 : 0
   cluster_name      = var.eks_cluster_name
