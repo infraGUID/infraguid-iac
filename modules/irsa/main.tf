@@ -1,8 +1,4 @@
-# IRSA — IAM Roles for Service Accounts, federated through the cluster OIDC provider.
-# Each role trusts a specific Kubernetes service account (namespace + name).
-
 locals {
-  # Service accounts that assume each role.
   app_sa                = "system:serviceaccount:${var.app_namespace}:${var.app_service_account}"
   alb_controller_sa     = "system:serviceaccount:kube-system:aws-load-balancer-controller"
   external_secrets_sa   = "system:serviceaccount:external-secrets:external-secrets"
@@ -11,7 +7,6 @@ locals {
   cluster_autoscaler_sa = "system:serviceaccount:kube-system:cluster-autoscaler"
 }
 
-# Reusable assume-role policy generator for IRSA.
 data "aws_iam_policy_document" "assume" {
   for_each = {
     app                = local.app_sa
@@ -45,7 +40,6 @@ data "aws_iam_policy_document" "assume" {
   }
 }
 
-# ─────────────────────────── App role ───────────────────────────
 resource "aws_iam_role" "app" {
   name               = "${var.project}-${var.environment}-app-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["app"].json
@@ -93,7 +87,6 @@ resource "aws_iam_role_policy" "app" {
         Resource = [var.documents_bucket_arn, var.knowledge_base_bucket_arn]
       }
       ],
-      # SQS access for async ingestion: producer (/ingest) + consumer (worker).
       length(var.ingestion_queue_arns) > 0 ? [{
         Sid    = "SqsIngestion"
         Effect = "Allow"
@@ -110,7 +103,6 @@ resource "aws_iam_role_policy" "app" {
   })
 }
 
-# ───────────────────── AWS Load Balancer Controller role ─────────────────────
 resource "aws_iam_role" "alb_controller" {
   name               = "${var.project}-${var.environment}-alb-controller-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["alb_controller"].json
@@ -132,7 +124,6 @@ resource "aws_iam_role_policy_attachment" "alb_controller" {
   policy_arn = aws_iam_policy.alb_controller.arn
 }
 
-# ───────────────────────── External Secrets role ─────────────────────────
 resource "aws_iam_role" "external_secrets" {
   name               = "${var.project}-${var.environment}-external-secrets-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["external_secrets"].json
@@ -160,7 +151,6 @@ resource "aws_iam_role_policy" "external_secrets" {
   })
 }
 
-# ─────────────────────────── EBS CSI Driver role ───────────────────────────
 resource "aws_iam_role" "ebs_csi" {
   name               = "${var.project}-${var.environment}-ebs-csi-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["ebs_csi"].json
@@ -172,7 +162,6 @@ resource "aws_iam_role_policy_attachment" "ebs_csi" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
-# ───────────────────────────── Fluent Bit role ─────────────────────────────
 resource "aws_iam_role" "fluent_bit" {
   name               = "${var.project}-${var.environment}-fluent-bit-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["fluent_bit"].json
@@ -200,7 +189,6 @@ resource "aws_iam_role_policy" "fluent_bit" {
   })
 }
 
-# ─────────────────────────── Cluster Autoscaler role ───────────────────────────
 resource "aws_iam_role" "cluster_autoscaler" {
   name               = "${var.project}-${var.environment}-cluster-autoscaler-irsa"
   assume_role_policy = data.aws_iam_policy_document.assume["cluster_autoscaler"].json
@@ -215,7 +203,6 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
     Version = "2012-10-17"
     Statement = [
       {
-        # Read-only discovery of ASGs / instance types — must be Resource "*".
         Sid    = "Describe"
         Effect = "Allow"
         Action = [
@@ -233,8 +220,6 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
         Resource = "*"
       },
       {
-        # Scaling actions, scoped to ASGs owned by this cluster (managed node
-        # groups auto-tag their ASG with k8s.io/cluster-autoscaler/<cluster>=owned).
         Sid    = "Scale"
         Effect = "Allow"
         Action = [

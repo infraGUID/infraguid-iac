@@ -1,10 +1,5 @@
-name: CI/CD - Infrastructure (Terraform)
+﻿name: CI/CD - Infrastructure (Terraform)
 
-# Pull request to main -> validate only: fmt, init, validate, Trivy IaC scan
-#                         and a plan posted to the job summary. Never applies.
-# Push to main          -> plan (uploads artifact) then apply (downloads it).
-#                         The apply job is gated by the `production` environment
-#                         so the reviewer sees the plan summary before approving.
 on:
   pull_request:
     branches: [main]
@@ -135,7 +130,6 @@ jobs:
     if: github.event_name == 'push'
     needs: [plan]
     runs-on: ubuntu-latest
-    # Pauses here — reviewer sees the plan summary from the plan job before approving.
     environment: production
     steps:
       - uses: actions/checkout@v4

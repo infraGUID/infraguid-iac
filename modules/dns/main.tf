@@ -1,6 +1,3 @@
-# ACM Certificate (must be us-east-1 for CloudFront). Single wildcard cert:
-# *.<domain> covers all subdomains (www, argocd, api, …) and the apex <domain>
-# is added as a SAN because a wildcard does not match the bare zone apex.
 resource "aws_acm_certificate" "this" {
   domain_name               = "*.${var.domain_name}"
   subject_alternative_names = [var.domain_name]
@@ -15,7 +12,6 @@ resource "aws_acm_certificate" "this" {
   })
 }
 
-# DNS Validation Records
 resource "aws_route53_record" "cert_validation" {
   for_each = {
     for dvo in aws_acm_certificate.this.domain_validation_options : dvo.domain_name => {
@@ -34,7 +30,6 @@ resource "aws_route53_record" "cert_validation" {
   allow_overwrite = true
 }
 
-# Certificate Validation — Wait for DNS propagation
 resource "aws_acm_certificate_validation" "this" {
   certificate_arn         = aws_acm_certificate.this.arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]

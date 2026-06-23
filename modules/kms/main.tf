@@ -1,4 +1,3 @@
-# KMS Customer Managed Key — used for Secrets Manager, RDS, S3
 resource "aws_kms_key" "main" {
   description             = "${var.project}-${var.environment} master encryption key"
   deletion_window_in_days = 14
@@ -39,9 +38,6 @@ resource "aws_kms_key" "main" {
         }
       },
       {
-        # Lets SNS decrypt messages for delivery when a topic is encrypted with
-        # this CMK (AWS-0136). Publishers (e.g. the log-intel Lambda) authorize
-        # via their own IAM permissions on this key.
         Sid       = "AllowSNSService"
         Effect    = "Allow"
         Principal = { Service = "sns.amazonaws.com" }
@@ -49,8 +45,6 @@ resource "aws_kms_key" "main" {
         Resource  = "*"
       },
       {
-        # Lets CloudWatch Logs encrypt log groups with this CMK (AWS-0017),
-        # scoped to this account's log groups in this region.
         Sid       = "AllowCloudWatchLogs"
         Effect    = "Allow"
         Principal = { Service = "logs.${var.aws_region}.amazonaws.com" }

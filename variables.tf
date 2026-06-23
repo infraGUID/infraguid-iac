@@ -1,4 +1,3 @@
-# General
 variable "aws_region" {
   description = "AWS region for all resources"
   type        = string
@@ -17,7 +16,6 @@ variable "environment" {
   default     = "prod"
 }
 
-# Networking
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
@@ -30,7 +28,6 @@ variable "azs" {
   default     = ["us-east-1a", "us-east-1b"]
 }
 
-# EKS
 variable "eks_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
@@ -58,7 +55,7 @@ variable "node_min_size" {
 variable "node_max_size" {
   description = "Maximum number of worker nodes"
   type        = number
-  default     = 3
+  default     = 5
 }
 
 variable "app_namespace" {
@@ -67,14 +64,12 @@ variable "app_namespace" {
   default     = "infraguid"
 }
 
-# ECR
 variable "ecr_namespace" {
   description = "ECR repository namespace prefix"
   type        = string
   default     = "infragui"
 }
 
-# Database
 variable "rds_instance_class" {
   description = "RDS instance class"
   type        = string
@@ -105,7 +100,6 @@ variable "rds_username" {
   default     = "infraguidai_admin"
 }
 
-# Domain & DNS
 variable "domain_name" {
   description = "Domain name for the application"
   type        = string
@@ -118,21 +112,18 @@ variable "hosted_zone_id" {
   default     = "Z02852643DE8LADNB6SIL"
 }
 
-# AWS Account
 variable "aws_account_id" {
   description = "AWS Account ID"
   type        = string
   default     = "901607650789"
 }
 
-# CloudFront (frontend CDN)
 variable "enable_cloudfront" {
   description = "Create the CloudFront distribution in front of the ALB. Enable only after the Gateway/ALB exists; the ALB origin is then auto-discovered by cluster tag."
   type        = bool
   default     = false
 }
 
-# Log Intelligence Agent
 variable "alert_email" {
   description = "Admin email subscribed to the SNS alerts topic"
   type        = string
@@ -163,7 +154,6 @@ variable "argocd_server_url" {
   default     = ""
 }
 
-# ── Disaster Recovery ─────────────────────────────────────────────────────────
 variable "dr_region" {
   description = "AWS region for DR resources (S3 replica buckets, RDS backup replication)"
   type        = string

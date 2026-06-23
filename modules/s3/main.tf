@@ -8,10 +8,6 @@ terraform {
   }
 }
 
-# Fresh S3 buckets created by Terraform.
-#   documents       — application document storage (upload + ingestion source)
-#   knowledge-base  — RAG knowledge base source documents
-#   lambda-artifacts — deployment zips for the log-intel Lambda
 locals {
   buckets = {
     documents        = "${var.project}-${var.environment}-documents-${var.aws_account_id}"
@@ -67,8 +63,6 @@ resource "aws_s3_bucket_public_access_block" "this" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-
-# ── Cross-Region Replication (CRR) to DR region ──────────────────────────────
 
 resource "aws_iam_role" "replication" {
   count = var.enable_replication ? 1 : 0
@@ -179,12 +173,6 @@ resource "aws_s3_bucket_public_access_block" "replica" {
   restrict_public_buckets = true
 }
 
-# ── Server access logging (AWS-0089) ─────────────────────────────────────────
-# Dedicated target bucket for the application buckets' S3 server access logs.
-# SSE-S3 (not the CMK) is used deliberately: it's the reliable, supported path
-# for log delivery, and these are low-sensitivity access logs.
-# trivy:ignore:AWS-0089 This is the log-target bucket; logging it would loop.
-# trivy:ignore:AWS-0132 SSE-S3 is intentional for reliable access-log delivery.
 resource "aws_s3_bucket" "access_logs" {
   bucket = "${var.project}-${var.environment}-access-logs-${var.aws_account_id}"
 
@@ -218,7 +206,6 @@ resource "aws_s3_bucket_public_access_block" "access_logs" {
   restrict_public_buckets = true
 }
 
-# Allow the S3 server-access-logging service to deliver logs from the app buckets.
 resource "aws_s3_bucket_policy" "access_logs" {
   bucket = aws_s3_bucket.access_logs.id
   policy = jsonencode({

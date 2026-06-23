@@ -1,10 +1,8 @@
-# Application URL
 output "app_url" {
   description = "Application URL"
   value       = "https://${var.domain_name}"
 }
 
-# EKS
 output "eks_cluster_name" {
   description = "EKS cluster name"
   value       = module.eks.cluster_name
@@ -25,7 +23,6 @@ output "oidc_provider_arn" {
   value       = module.eks.oidc_provider_arn
 }
 
-# ECR
 output "ecr_registry_url" {
   description = "ECR registry base URL"
   value       = module.ecr.registry_url
@@ -36,7 +33,6 @@ output "ecr_repository_urls" {
   value       = module.ecr.repository_urls
 }
 
-# IRSA role ARNs (annotate the matching Kubernetes service accounts with these)
 output "irsa_app_role_arn" {
   description = "IRSA role ARN for application pods"
   value       = module.irsa.app_role_arn
@@ -67,13 +63,11 @@ output "irsa_cluster_autoscaler_role_arn" {
   value       = module.irsa.cluster_autoscaler_role_arn
 }
 
-# RDS
 output "rds_endpoint" {
   description = "RDS endpoint"
   value       = module.rds.endpoint
 }
 
-# Cognito
 output "cognito_user_pool_id" {
   description = "Cognito User Pool ID"
   value       = module.cognito.user_pool_id
@@ -84,13 +78,11 @@ output "cognito_app_client_id" {
   value       = module.cognito.app_client_id
 }
 
-# Secrets Manager
 output "secret_name" {
   description = "Secrets Manager secret name"
   value       = module.secrets.secret_name
 }
 
-# S3 buckets
 output "documents_bucket_name" {
   description = "Documents S3 bucket name"
   value       = module.s3.documents_bucket_name
@@ -106,13 +98,11 @@ output "lambda_artifacts_bucket_name" {
   value       = module.s3.lambda_artifacts_bucket_name
 }
 
-# ACM certificate (used by the ALB Ingress)
 output "acm_certificate_arn" {
   description = "Validated ACM certificate ARN for the ALB Ingress"
   value       = module.dns.acm_certificate_validated_arn
 }
 
-# CloudFront (frontend CDN) — null until enable_cloudfront = true
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID (use for cache invalidations on deploy)"
   value       = var.enable_cloudfront ? module.frontend[0].cloudfront_distribution_id : null
@@ -128,19 +118,16 @@ output "alb_cloudfront_security_group_id" {
   value       = var.enable_cloudfront ? module.frontend[0].alb_security_group_id : null
 }
 
-# SNS
 output "alerts_topic_arn" {
   description = "SNS alerts topic ARN"
   value       = module.sns.topic_arn
 }
 
-# CloudWatch autoscaling alarms
 output "autoscaling_alarm_topic_arn" {
   description = "SNS topic ARN that the EKS autoscaling CloudWatch alarms publish to"
   value       = module.cloudwatch.alarm_topic_arn
 }
 
-# SQS (async ingestion)
 output "sqs_ingestion_queue_url" {
   description = "Ingestion SQS queue URL (injected into the app secret as SQS_INGESTION_QUEUE_URL)"
   value       = module.sqs.ingestion_queue_url
@@ -151,21 +138,16 @@ output "sqs_ingestion_dlq_url" {
   value       = module.sqs.ingestion_dlq_url
 }
 
-# Log Intelligence Lambda
 output "log_intel_function_name" {
   description = "Log Intelligence Lambda function name"
   value       = var.enable_log_intel ? module.log_intel_lambda[0].function_name : null
 }
 
-# VPC
 output "vpc_id" {
   description = "VPC ID"
   value       = module.vpc.vpc_id
 }
 
-# ── Cost Estimation ─────────────────────────────────────────────────────────
-# Based on us-east-1 on-demand pricing. Run `infracost breakdown --path .`
-# for authoritative per-resource costs with live pricing data.
 output "estimated_monthly_cost_usd" {
   description = "Rough estimated total monthly AWS cost in USD (us-east-1, on-demand)"
   value       = local.cost_total_monthly
