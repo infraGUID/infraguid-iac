@@ -113,7 +113,6 @@ jobs:
         run: |
           RUN_ID=$(gh run list \
             --workflow=terraform.yml \
-            --branch="${{ github.ref_name }}" \
             --event=pull_request \
             --status=success \
             --limit=1 \
