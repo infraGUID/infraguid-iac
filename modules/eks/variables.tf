@@ -45,7 +45,7 @@ variable "node_min_size" {
 variable "node_max_size" {
   description = "Maximum number of worker nodes (headroom for the Cluster Autoscaler)"
   type        = number
-  default     = 5
+  default     = 6
 }
 
 variable "vpc_cni_version" {
