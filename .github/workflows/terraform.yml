@@ -62,12 +62,14 @@ jobs:
           terraform plan -input=false -out=plan.tfplan
           terraform show -no-color plan.tfplan > plan.txt
 
-      - name: Post plan to job summary
-        run: |
-          echo "## Terraform Plan" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-pr
+          path: |
+            plan.tfplan
+            plan.txt
+          retention-days: 3
 
       - name: Setup Infracost
         continue-on-error: true
@@ -111,18 +113,13 @@ jobs:
           terraform plan -input=false -out=plan.tfplan
           terraform show -no-color plan.tfplan > plan.txt
 
-      - name: Post plan to job summary
-        run: |
-          echo "## Terraform Plan" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat plan.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: plan.tfplan
+          path: |
+            plan.tfplan
+            plan.txt
           retention-days: 1
 
   apply:
