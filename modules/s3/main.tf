@@ -130,7 +130,8 @@ resource "aws_s3_bucket" "replica" {
   for_each = local.replica_buckets
   provider = aws.dr
 
-  bucket = each.value
+  bucket        = each.value
+  force_destroy = true
 
   tags = merge(var.tags, {
     Name = each.value

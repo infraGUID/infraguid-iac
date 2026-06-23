@@ -2,11 +2,11 @@ terraform {
   required_version = ">= 1.5.0"
 
   backend "s3" {
-    bucket         = "infraguidai-tfstate-901607650789"
-    key            = "prod/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "infraguidai-tfstate-lock"
-    encrypt        = true
+    bucket       = "infraguidai-tfstate-901607650789"
+    key          = "prod/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 
   required_providers {

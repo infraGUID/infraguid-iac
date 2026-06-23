@@ -40,7 +40,7 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform init -input=false
+        run: terraform init -input=false -reconfigure
 
       - name: Terraform validate
         run: terraform validate -no-color
@@ -129,7 +129,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Terraform init
-        run: terraform init -input=false
+        run: terraform init -input=false -reconfigure
 
       - name: Terraform apply
         run: terraform apply -input=false plan.tfplan

@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 resource "aws_kms_key" "main" {
   description             = "${var.project}-${var.environment} master encryption key"
   deletion_window_in_days = 14
