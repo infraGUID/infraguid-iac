@@ -163,7 +163,7 @@ variable "dr_region" {
 variable "enable_s3_replication" {
   description = "Enable cross-region S3 replication from primary to dr_region"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "rds_backup_retention_period" {
