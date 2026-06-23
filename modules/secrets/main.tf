@@ -1,4 +1,4 @@
-﻿resource "aws_secretsmanager_secret" "app" {
+resource "aws_secretsmanager_secret" "app" {
   name        = "${var.project}/${var.environment}/app-secrets"
   description = "Application secrets for ${var.project} ${var.environment}"
   kms_key_id  = var.kms_key_arn

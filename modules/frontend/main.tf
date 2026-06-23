@@ -1,4 +1,4 @@
-﻿locals {
+locals {
   alb_origin_id = "alb-${var.environment}"
 }
 
@@ -45,7 +45,7 @@ resource "aws_cloudfront_distribution" "this" {
 
     forwarded_values {
       query_string = false
-      headers = ["Host"]
+      headers      = ["Host"]
       cookies {
         forward = "none"
       }

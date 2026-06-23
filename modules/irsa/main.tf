@@ -1,4 +1,4 @@
-﻿locals {
+locals {
   app_sa                = "system:serviceaccount:${var.app_namespace}:${var.app_service_account}"
   alb_controller_sa     = "system:serviceaccount:kube-system:aws-load-balancer-controller"
   external_secrets_sa   = "system:serviceaccount:external-secrets:external-secrets"

@@ -1,4 +1,4 @@
-﻿output "app_role_arn" {
+output "app_role_arn" {
   description = "IRSA role ARN for application pods"
   value       = aws_iam_role.app.arn
 }

@@ -1,4 +1,4 @@
-﻿resource "aws_kms_key" "alarms" {
+resource "aws_kms_key" "alarms" {
   description             = "${var.project}-${var.environment} CloudWatch alarm topic key"
   deletion_window_in_days = 7
   enable_key_rotation     = true

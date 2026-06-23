@@ -1,4 +1,4 @@
-﻿resource "aws_cognito_user_pool" "this" {
+resource "aws_cognito_user_pool" "this" {
   name = "${var.project}-${var.environment}-users"
 
   username_attributes      = ["email"]

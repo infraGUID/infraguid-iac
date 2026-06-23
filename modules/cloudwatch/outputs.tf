@@ -1,4 +1,4 @@
-﻿output "alarm_topic_arn" {
+output "alarm_topic_arn" {
   description = "SNS topic ARN that the autoscaling alarms publish to"
   value       = aws_sns_topic.alarms.arn
 }

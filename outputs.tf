@@ -1,4 +1,4 @@
-﻿output "app_url" {
+output "app_url" {
   description = "Application URL"
   value       = "https://${var.domain_name}"
 }

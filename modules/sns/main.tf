@@ -1,4 +1,4 @@
-﻿resource "aws_sns_topic" "alerts" {
+resource "aws_sns_topic" "alerts" {
   name              = "${var.project}-${var.environment}-alerts"
   kms_master_key_id = var.kms_key_id
 

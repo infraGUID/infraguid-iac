@@ -1,7 +1,7 @@
-﻿resource "aws_ecr_repository" "this" {
+resource "aws_ecr_repository" "this" {
   for_each = toset(var.repositories)
 
-  name = "${var.namespace}/${each.value}"
+  name                 = "${var.namespace}/${each.value}"
   image_tag_mutability = "IMMUTABLE"
   force_delete         = true
 

@@ -1,4 +1,4 @@
-﻿resource "aws_cloudwatch_log_group" "pod_logs" {
+resource "aws_cloudwatch_log_group" "pod_logs" {
   name              = var.log_group_name
   retention_in_days = var.log_retention_days
 
@@ -140,9 +140,9 @@ data "archive_file" "deps_layer" {
 }
 
 resource "aws_s3_object" "deps_layer" {
-  bucket = var.artifacts_bucket
-  key    = "layers/log-intel-deps-${data.archive_file.deps_layer.output_base64sha256}.zip"
-  source = data.archive_file.deps_layer.output_path
+  bucket      = var.artifacts_bucket
+  key         = "layers/log-intel-deps-${data.archive_file.deps_layer.output_base64sha256}.zip"
+  source      = data.archive_file.deps_layer.output_path
   source_hash = data.archive_file.deps_layer.output_base64sha256
 }
 

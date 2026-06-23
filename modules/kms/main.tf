@@ -1,4 +1,4 @@
-﻿resource "aws_kms_key" "main" {
+resource "aws_kms_key" "main" {
   description             = "${var.project}-${var.environment} master encryption key"
   deletion_window_in_days = 14
   enable_key_rotation     = true
