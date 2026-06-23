@@ -415,6 +415,16 @@ module "log_intel_lambda" {
   tags                      = local.common_tags
 }
 
+# One-time adoption of the pre-existing pod-logs CloudWatch log group. After a
+# CI apply destroyed the log-intel module, the group was recreated out-of-band
+# so Fluent Bit could keep shipping; a plain re-enable apply would otherwise
+# fail with "log group already exists". This import block makes the apply ADOPT
+# it. Safe to remove in a follow-up once the first apply has imported it.
+import {
+  to = module.log_intel_lambda[0].aws_cloudwatch_log_group.pod_logs
+  id = "/infraguid/prod/pod-logs"
+}
+
 # Allow the log-intel Lambda to reach the EKS API server (private endpoint).
 # Without this the Lambda's read-only k8s tool calls (pod status, events, nodes)
 # time out, and the agent can only report from logs/metrics. RBAC access is
