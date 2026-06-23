@@ -31,8 +31,17 @@ jobs:
     name: Validate, Scan & Plan
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # log-intel builds its Lambda from the microservices repo; check it out as a
+    # subdir and point lambda_source_dir at it (absolute, stable across runners).
+    env:
+      TF_VAR_lambda_source_dir: ${{ github.workspace }}/infraguid-microservices/services/log-intel-lambda
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout infraguid-microservices (log-intel Lambda source)
+        uses: actions/checkout@v4
+        with:
+          repository: infraGUID/infraguid-microservices
+          path: infraguid-microservices
       - uses: hashicorp/setup-terraform@v3
 
       - name: Configure AWS credentials (OIDC)
@@ -98,8 +107,15 @@ jobs:
     name: Terraform Plan
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_lambda_source_dir: ${{ github.workspace }}/infraguid-microservices/services/log-intel-lambda
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout infraguid-microservices (log-intel Lambda source)
+        uses: actions/checkout@v4
+        with:
+          repository: infraGUID/infraguid-microservices
+          path: infraguid-microservices
       - uses: hashicorp/setup-terraform@v3
 
       - name: Configure AWS credentials (OIDC)
@@ -130,6 +146,17 @@ jobs:
           path: plan.tfplan
           retention-days: 1
 
+      # The log-intel function zip is built by archive_file during plan, on this
+      # runner. The apply job runs on a different runner and applies the saved
+      # plan (which does not rebuild it), so carry the build dir across.
+      - name: Upload log-intel build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-intel-build
+          path: modules/log-intel-lambda/build/
+          retention-days: 1
+          if-no-files-found: ignore
+
   apply:
     name: Terraform Apply
     if: github.event_name == 'push'
@@ -139,6 +166,14 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      # Re-checkout the Lambda source: the saved plan's lambda_source_dir is an
+      # absolute path under github.workspace (stable across runners), and the
+      # apply-time pip build (terraform_data.deps) reads requirements.txt from it.
+      - name: Checkout infraguid-microservices (log-intel Lambda source)
+        uses: actions/checkout@v4
+        with:
+          repository: infraGUID/infraguid-microservices
+          path: infraguid-microservices
       - uses: hashicorp/setup-terraform@v3
 
       - name: Configure AWS credentials (OIDC)
@@ -151,6 +186,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
+
+      # Restore the log-intel function zip built during plan so apply can upload it.
+      - name: Download log-intel build artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: log-intel-build
+          path: modules/log-intel-lambda/build/
 
       - name: Terraform init
         run: terraform init -input=false

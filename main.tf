@@ -408,7 +408,7 @@ module "log_intel_lambda" {
   kms_key_arn               = module.kms.key_arn
   eks_cluster_name          = module.eks.cluster_name
   bedrock_model_id          = var.bedrock_logintel_model_id
-  lambda_source_dir         = "${path.root}/../infraguid-microservices/services/log-intel-lambda"
+  lambda_source_dir         = var.lambda_source_dir != "" ? var.lambda_source_dir : "${path.root}/../infraguid-microservices/services/log-intel-lambda"
   artifacts_bucket          = module.s3.lambda_artifacts_bucket_name
   enable_argocd_correlation = var.enable_argocd_correlation
   argocd_server_url         = var.argocd_server_url

@@ -163,6 +163,12 @@ variable "argocd_server_url" {
   default     = ""
 }
 
+variable "lambda_source_dir" {
+  description = "Filesystem path to the log-intel-lambda source (in the infraguid-microservices repo). Empty = assume a sibling checkout next to this repo, which is the local-run default. CI sets TF_VAR_lambda_source_dir to the path where it checks out infraguid-microservices."
+  type        = string
+  default     = ""
+}
+
 # ── Disaster Recovery ─────────────────────────────────────────────────────────
 variable "dr_region" {
   description = "AWS region for DR resources (S3 replica buckets, RDS backup replication)"
